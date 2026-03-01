@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Bản đồ điểm bầu cử - Phường Hồng Bàng</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    :root { --pad: 10px; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    .wrap { display: flex; flex-direction: column; height: 100vh; }
+
+    /* Search bar */
+    .topbar {
+      padding: var(--pad);
+      border-bottom: 1px solid #e5e5e5;
+      background: #fff;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    #searchBox {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 16px;
+      padding: 10px 12px;
+      border: 1px solid #d6d6d6;
+      border-radius: 10px;
+      outline: none;
+    }
+    #searchBox:focus { border-color: #9aa0a6; }
+
+    /* Map + list layout */
+    #map { height: 58vh; }
+    #list {
+      height: 42vh;
+      overflow-y: auto;
+      padding: 6px var(--pad) var(--pad);
+      background: #fff;
+    }
+
+    .row {
+      padding: 10px 10px;
+      border: 1px solid #eee;
+      border-radius: 12px;
+      margin-top: 8px;
+      cursor: pointer;
+      background: #fff;
+    }
+    .row:hover { background: #fafafa; }
+    .row .name { font-weight: 700; margin-bottom: 6px; }
+    .row .meta { color: #444; font-size: 14px; line-height: 1.35; }
+
+    .count { margin-top: 8px; font-size: 13px; color: #555; }
+
+    /* Popup */
+    .popup-title { font-weight: 800; font-size: 16px; margin: 0 0 6px; }
+    .popup-desc { margin: 0 0 8px; font-size: 13px; line-height: 1.35; }
+    .popup-img {
+      width: 100%;
+      max-width: 260px;
+      height: auto;
+      border-radius: 10px;
+      display: block;
+      margin: 0 0 8px;
+    }
+    .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      display: inline-block;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      text-decoration: none;
+      color: #111;
+      font-size: 13px;
+      background: #fff;
+    }
+    .btn:hover { background: #f3f3f3; }
+
+    /* Desktop: map left, list right */
+    @media (min-width: 980px) {
+      .main { display: grid; grid-template-columns: 1.6fr 1fr; height: calc(100vh - 72px); }
+      #map { height: 100%; }
+      #list { height: 100%; border-left: 1px solid #eee; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <input id="searchBox" type="text" placeholder="Tìm trong 27 điểm (ví dụ: số 01, số 12, ...)" />
+    <div class="count" id="countInfo"></div>
+  </div>
+
+  <div class="main">
+    <div id="map"></div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  // =========================
+  // 1) DỮ LIỆU 27 ĐIỂM (đọc từ CSV bạn gửi)
+  // =========================
+  // Nếu bạn có link ảnh cho từng điểm: điền vào trường "img"
+  // Ví dụ:
+  // "img": "https://.../anh-ubnd.jpg"
+  const locations = [
+  {
+    "name": "Khu vực bỏ phiếu số 01",
+    "lat": 20.8556995,
+    "lng": 106.6743643,
+    "info": "Các TDP: Phan Bội Châu, Phạm Hồng Thái, Hoàng Hoa Thám",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 02",
+    "lat": 20.8558374,
+    "lng": 106.6764779,
+    "info": "Các TDP Quang Trung, Lãn Ông, Lý Thường Kiệt",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 03",
+    "lat": 20.8581441,
+    "lng": 106.6846449,
+    "info": "Các TDP Hoàng Văn Thụ 1, Trần Hưng Đạo",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 04",
+    "lat": 20.8589979,
+    "lng": 106.6822112,
+    "info": "Các TDP Quang Trung 1, Đinh Tiên Hoàng",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 05",
+    "lat": 20.8583688,
+    "lng": 106.6812832,
+    "info": "Các TDP Quang Trung 2, Quang Trung 3",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 06",
+    "lat": 20.8623032,
+    "lng": 106.6863694,
+    "info": "Các TDP Minh Khai, Lý Tự Trọng; Trạm 41 - Bộ Tư lệnh Thông tin",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 07",
+    "lat": 20.8633797,
+    "lng": 106.6812507,
+    "info": "Các TDP Cù Chính Lan, Hoàng Văn Thụ 2; Công an phường; Nhà khác Quân khu 3",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 08",
+    "lat": 20.8616763,
+    "lng": 106.675347,
+    "info": "Các TDP Phan Đình Phùng, Lạc Long, Bạch Đằng",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 09",
+    "lat": 20.8622897,
+    "lng": 106.6736206,
+    "info": "Các TDP Trần Phú, Lạc Hồng, Ngô Gia Tự",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 10",
+    "lat": 20.8618507,
+    "lng": 106.6717356,
+    "info": "Các TDP Đoàn Kết, Lê Hồng Phong, Hàng Kênh",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 11",
+    "lat": 20.8612849,
+    "lng": 106.669583,
+    "info": "Các TDP Lê Lợi, Hồng Bàng, Trần Nhật Duật",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 12",
+    "lat": 20.8606472,
+    "lng": 106.6679242,
+    "info": "Các TDP An Biên, Nguyễn Trãi, Trần Bình Trọng",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 13",
+    "lat": 20.8598696,
+    "lng": 106.6668432,
+    "info": "Các TDP Hồng Phong, Lê Duẩn, Nguyễn Huệ",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 14",
+    "lat": 20.8589073,
+    "lng": 106.6650584,
+    "info": "Các TDP Lê Hồng Sơn, Tôn Đức Thắng, Trường Chinh",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 15",
+    "lat": 20.8580275,
+    "lng": 106.6636888,
+    "info": "Các TDP Tân Tiến, Tân Hưng, Tân Lập",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 16",
+    "lat": 20.8573772,
+    "lng": 106.6619202,
+    "info": "Các TDP Hùng Vương, Kim Đồng, Trần Quốc Toản",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 17",
+    "lat": 20.8587359,
+    "lng": 106.6594203,
+    "info": "Các TDP Lương Khánh Thiện, Nguyễn Bỉnh Khiêm, Hai Bà Trưng",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 18",
+    "lat": 20.8623295,
+    "lng": 106.6574305,
+    "info": "Các TDP Trần Quang Khải, Nguyễn Đức Cảnh, Hoàng Quốc Việt",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 19",
+    "lat": 20.8643698,
+    "lng": 106.6557248,
+    "info": "Các TDP Hạ Lý 1, Hạ Lý 2, Hạ Lý 3",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 20",
+    "lat": 20.8662522,
+    "lng": 106.6532608,
+    "info": "Các TDP Hạ Lý 4, Hạ Lý 5, Hạ Lý 6",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 21",
+    "lat": 20.8687941,
+    "lng": 106.6509713,
+    "info": "Các TDP Hạ Lý 7, Hạ Lý 8, Hạ Lý 9",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 22",
+    "lat": 20.870704,
+    "lng": 106.6484912,
+    "info": "Các TDP Hạ Lý 10, Hạ Lý 11, Hạ Lý 12",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 23",
+    "lat": 20.8721266,
+    "lng": 106.6455463,
+    "info": "Các TDP Hạ Lý 13, Hạ Lý 14, Hạ Lý 15",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 24",
+    "lat": 20.8733372,
+    "lng": 106.6417582,
+    "info": "Các TDP Quỳnh Cư 3, Quỳnh Cư 4, Quỳnh Cư 5",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 25",
+    "lat": 20.8732204,
+    "lng": 106.6377149,
+    "info": "Các TDP Quỳnh Cư 6, Quỳnh Cư 7, Quỳnh Cư 8",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 26",
+    "lat": 20.8732346,
+    "lng": 106.6333659,
+    "info": "Các TDP Quỳnh Cư 9, Quỳnh Cư 10, Quỳnh Cư 11",
+    "img": ""
+  },
+  {
+    "name": "Khu vực bỏ phiếu số 27",
+    "lat": 20.8737966,
+    "lng": 106.6281398,
+    "info": "Các TDP: Quỳnh Cư 1, Quỳnh Cư 2,",
+    "img": ""
+  }
+];
+
+  // =========================
+  // 2) HÀM TIỆN ÍCH
+  // =========================
+  function escapeHtml(str) {
+    return String(str ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function googleDirectionsLink(lat, lng) {
+    // Mở chế độ chỉ đường trong Google Maps (works on mobile)
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  }
+
+  // =========================
+  // 3) KHỞI TẠO BẢN ĐỒ
+  // =========================
+  const map = L.map('map', { zoomControl: true });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  // Tạo marker + fit bounds
+  const markersByIndex = [];
+  const group = L.featureGroup();
+
+  locations.forEach((loc, idx) => {
+    const title = escapeHtml(loc.name);
+    const desc = escapeHtml(loc.info);
+
+    const imgHtml = loc.img
+      ? `<img class="popup-img" src="${escapeHtml(loc.img)}" alt="${title}" />`
+      : "";
+
+    const popupHtml = `
+      <div>
+        <div class="popup-title">${title}</div>
+        ${imgHtml}
+        <div class="popup-desc">${desc.replaceAll("\n","<br>")}</div>
+        <div class="btns">
+          <a class="btn" href="${googleDirectionsLink(loc.lat, loc.lng)}" target="_blank" rel="noopener">Chỉ đường</a>
+          <a class="btn" href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" rel="noopener">Mở Google Maps</a>
+        </div>
+      </div>
+    `;
+
+    const marker = L.marker([loc.lat, loc.lng]).bindPopup(popupHtml);
+    marker.addTo(map);
+    markersByIndex[idx] = marker;
+    group.addLayer(marker);
+  });
+
+  group.addTo(map);
+  map.fitBounds(group.getBounds().pad(0.12)); // tự zoom vừa đẹp
+
+  // =========================
+  // 4) RENDER DANH SÁCH + SEARCH (CHỈ TRONG 27 ĐIỂM)
+  // =========================
+  const listEl = document.getElementById("list");
+  const countEl = document.getElementById("countInfo");
+  const searchEl = document.getElementById("searchBox");
+
+  function render(filterText = "") {
+    const q = filterText.trim().toLowerCase();
+    listEl.innerHTML = "";
+
+    let shown = 0;
+
+    locations.forEach((loc, idx) => {
+      const hay = (loc.name + " " + (loc.info || "")).toLowerCase();
+      const match = q === "" || hay.includes(q);
+
+      // Ẩn/hiện marker theo search (giúp “tìm” rõ ràng trên map)
+      const m = markersByIndex[idx];
+      if (match) {
+        if (!map.hasLayer(m)) m.addTo(map);
+        shown++;
+
+        const row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML = `
+          <div class="name">${escapeHtml(loc.name)}</div>
+          <div class="meta">${escapeHtml(loc.info)}</div>
+        `;
+        row.onclick = () => {
+          map.setView([loc.lat, loc.lng], 17, { animate: true });
+          m.openPopup();
+        };
+        listEl.appendChild(row);
+      } else {
+        if (map.hasLayer(m)) map.removeLayer(m);
+      }
+    });
+
+    countEl.textContent = `Đang hiển thị: ${shown}/${locations.length} điểm`;
+  }
+
+  searchEl.addEventListener("input", (e) => render(e.target.value));
+  render("");
+
+</script>
+</body>
+</html>
